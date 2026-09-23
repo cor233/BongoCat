@@ -65,7 +65,7 @@ static bool render(BongoCatApp *app, bool present) {
     glViewport(0, 0, width, height);
     bongo_cat_live2d_set_mirror(app->live2d, app->settings.model.mirror);
     bongo_cat_diagnostics_phase("model-draw");
-    bongo_cat_live2d_draw(app->live2d);
+    if (app->loaded_model[0]) bongo_cat_live2d_draw(app->live2d);
     bongo_cat_diagnostics_phase("overlay-draw");
     if (content_viewport)
         glViewport(content_x, content_y, content_width, content_height);

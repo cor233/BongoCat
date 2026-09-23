@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-set(BONGO_CAT_VERSION "1.12.0")
+set(BONGO_CAT_VERSION "1.12.1")
 project(BongoCat VERSION ${BONGO_CAT_VERSION} DESCRIPTION "BongoCat" HOMEPAGE_URL "https://github.com/vladelaina/BongoCat" LANGUAGES C CXX)
 include(cmake/Version.cmake)
 include(FetchContent)
@@ -58,6 +58,9 @@ if(EXISTS "${CUBISM_CORE_HEADER}")
       src/live2d/cubism_expression.cpp
       src/live2d/cubism_model_load.cpp
       src/live2d/cubism_model_renderer.cpp
+      src/live2d/cubism_model_masks.cpp
+      src/live2d/cubism_model_projection.cpp
+      src/live2d/cubism_model_textures.cpp
       src/live2d/cubism_model_idle.cpp
       src/live2d/cubism_model_update.cpp
       src/live2d/cubism_parameter_overrides.cpp

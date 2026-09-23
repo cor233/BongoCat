@@ -7,6 +7,9 @@ static uint64_t frame_interval_ns(const BongoCatApp *app) {
 #ifdef BONGO_CAT_HAS_CUBISM
     int fps = app && app->settings.model.max_fps > 0 ?
         app->settings.model.max_fps : 60;
+    if (app && app->settings.model.max_fps == BONGO_CAT_DISPLAY_MAX_FPS &&
+        app->startup_display_fps > 60)
+        fps = app->startup_display_fps;
     return 1000000000ull / (uint64_t)fps;
 #else
     (void)app;
@@ -92,7 +95,20 @@ bool bongo_cat_window_wait_timeout_self_test(void) {
     if (!(interval_30 > interval_60 && interval_60 > interval_120) ||
         bongo_cat_model_frame_due(app, now + interval_120 - 1) ||
         !bongo_cat_model_frame_due(app, now + interval_120)) goto done;
+    app->settings.model.max_fps = BONGO_CAT_DISPLAY_MAX_FPS;
+    app->startup_display_fps = 144;
+    uint64_t interval_display = frame_interval_ns(app);
+    if (interval_display != 1000000000ull / 144 ||
+        bongo_cat_model_frame_due(app, now + interval_display - 1) ||
+        !bongo_cat_model_frame_due(app, now + interval_display)) goto done;
+    const int fallback_fps[] = {0, 50, 60};
+    for (size_t i = 0; i < sizeof(fallback_fps) / sizeof(fallback_fps[0]); ++i) {
+        app->startup_display_fps = fallback_fps[i];
+        if (frame_interval_ns(app) != interval_60) goto done;
+    }
+    app->startup_display_fps = 144;
     app->settings.model.max_fps = 60;
+    if (frame_interval_ns(app) != interval_60) goto done;
 #endif
     int frame_wait = remaining_ms(now + frame_interval_ns(app), now);
     if (bongo_cat_window_wait_timeout(app, now) != frame_wait ||

@@ -139,11 +139,6 @@ extern "C" BongoCatLive2D *bongo_cat_live2d_create(const char *asset_root,
 
 extern "C" void bongo_cat_live2d_destroy(BongoCatLive2D *runtime) {
     if (!runtime) return;
-    if (runtime->retired_count) SDL_Log("[runtime] Live2D resource handoff: "
-        "stage=retirement-flush queue=%u current_context=%p",
-        runtime->retired_count, (void *)SDL_GL_GetCurrentContext());
-    for (unsigned i = 0; i < runtime->retired_count; ++i)
-        delete runtime->retired[i].model;
     delete runtime->model;
     delete runtime;
     stop_framework();
@@ -188,26 +183,10 @@ extern "C" void bongo_cat_live2d_reshape(BongoCatLive2D *runtime, int width, int
 }
 extern "C" bool bongo_cat_live2d_update(BongoCatLive2D *runtime, float elapsed) {
     if (!runtime) return false;
-    bool changed = runtime->model && runtime->model->update(elapsed);
-    // Finish deferred releases even when the replacement model is static.
-    return changed || runtime->retired_count > 0;
+    return runtime->model && runtime->model->update(elapsed);
 }
 extern "C" void bongo_cat_live2d_draw(BongoCatLive2D *runtime) {
     if (!runtime) return;
-    unsigned keep = 0, released = 0;
-    for (unsigned i = 0; i < runtime->retired_count; ++i) {
-        BongoCatRetiredModel item = runtime->retired[i];
-        if (item.frames_remaining) item.frames_remaining--;
-        if (!item.frames_remaining) {
-            delete item.model;
-            released++;
-        } else runtime->retired[keep++] = item;
-    }
-    runtime->retired_count = keep;
-    if (released) SDL_Log("[runtime] Live2D resource handoff: "
-        "stage=retirement-complete released=%u queue=%u current_context=%p "
-        "gl_error=0x%x", released, keep, (void *)SDL_GL_GetCurrentContext(),
-        (unsigned)glGetError());
     if (runtime->model) runtime->model->draw();
 }
 extern "C" void bongo_cat_live2d_set_mirror(BongoCatLive2D *runtime, bool mirror) {

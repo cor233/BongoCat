@@ -2,7 +2,6 @@
 #include "bongo_cat/overlay.h"
 
 #include <math.h>
-#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -382,13 +381,6 @@ void bongo_cat_app_model_shortcuts_prune(BongoCatApp *app) {
         else { *link = cache->next; free_shortcut_cache(cache); }
     }
 }
-
-static bool binding_equal(const char *left, const char *right) {
-    if (!left || !right || !*left || !*right) return false;
-    while (*left && *right)
-        if (tolower((unsigned char)*left++) != tolower((unsigned char)*right++)) return false;
-    return *left == *right;
-}
 bool bongo_cat_app_shortcut_conflicts(BongoCatApp *app,
     const char *shortcut, const char *exclude) {
     if (!app || !shortcut || !*shortcut) return false;
@@ -397,17 +389,17 @@ bool bongo_cat_app_shortcut_conflicts(BongoCatApp *app,
         global->mirror, global->pass_through, global->always_on_top,
         global->open_menu};
     for (size_t i = 0; i < sizeof(keys) / sizeof(keys[0]); ++i)
-        if (keys[i] != exclude && binding_equal(keys[i], shortcut)) return true;
+        if (keys[i] != exclude && bongo_cat_shortcut_equal(keys[i], shortcut)) return true;
     /* Model actions may intentionally share a key. */
     if (bongo_cat_app_behavior_binding_target(app, exclude)) return false;
     for (size_t i = 0; i < app->settings.behavior_shortcut_count; ++i) {
         const BongoCatBehaviorShortcut *value = &app->settings.behavior_shortcuts[i];
         if (!value->shortcut_external && !value->shortcut_disabled &&
-            binding_equal(value->shortcut, shortcut)) return true;
+            bongo_cat_shortcut_equal(value->shortcut, shortcut)) return true;
     }
     for (BongoCatModelShortcutCache *cache = app->model_shortcuts; cache; cache = cache->next)
         for (BongoCatModelShortcutNode *node = cache->bindings; node; node = node->next)
-            if (!node->binding.shortcut_disabled && binding_equal(node->binding.shortcut, shortcut)) return true;
+            if (!node->binding.shortcut_disabled && bongo_cat_shortcut_equal(node->binding.shortcut, shortcut)) return true;
     return false;
 }
 

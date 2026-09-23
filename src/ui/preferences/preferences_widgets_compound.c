@@ -6,7 +6,7 @@
 #include <stdio.h>
 
 /* Measure and draw with the same UTF-8 wrapping, omitting highlight markers. */
-static int detail_text(struct nk_context *context, const char *text,
+int bongo_cat_pref_detail_text(struct nk_context *context, const char *text,
     struct nk_rect bounds, bool draw) {
     if (!text || !text[0]) return 0;
     const struct nk_user_font *font = bongo_cat_ui_caption_font(context);
@@ -55,7 +55,7 @@ bool bongo_cat_pref_toggle_float_detail(struct nk_context *context, const char *
     bool available) {
     float detail_width = NK_MAX(1.0f,
         nk_window_get_content_region(context).w - 26.0f - 33.0f);
-    int lines = detail_text(context, detail, nk_rect(0, 0, detail_width, 0), false);
+    int lines = bongo_cat_pref_detail_text(context, detail, nk_rect(0, 0, detail_width, 0), false);
     FormStyle saved;
     if (!bongo_cat_pref_form_begin(context, id, lines, &saved)) return false;
     float content_width = nk_window_get_content_region(context).w;
@@ -89,7 +89,7 @@ bool bongo_cat_pref_toggle_float_detail(struct nk_context *context, const char *
         if (nk_widget(&bounds, context) != NK_WIDGET_INVALID) {
             bounds.x += 33.0f;
             bounds.w = detail_width;
-            detail_text(context, detail, bounds, true);
+            bongo_cat_pref_detail_text(context, detail, bounds, true);
         }
     }
     bongo_cat_pref_form_end(context, &saved);

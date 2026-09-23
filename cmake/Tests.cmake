@@ -1,4 +1,12 @@
 if(BUILD_TESTING)
+  add_executable(bongo_cat_mask_policy_tests tests/live2d/test_mask_policy.cpp)
+  target_include_directories(bongo_cat_mask_policy_tests PRIVATE src/live2d tests/support)
+  target_link_libraries(bongo_cat_mask_policy_tests PRIVATE bongo_cat_warnings)
+  add_test(NAME live2d-mask-policy COMMAND bongo_cat_mask_policy_tests)
+  add_test(NAME cubism-texture-sampling COMMAND ${CMAKE_COMMAND}
+    "-DROOT=${CMAKE_CURRENT_SOURCE_DIR}"
+    "-DSDK=${BONGO_CAT_CUBISM_SDK}"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckCubismTextureSampling.cmake")
   add_executable(bongo_cat_multi_pet_shortcut_tests
     tests/core/test_multi_pet_shortcuts.c)
   target_include_directories(bongo_cat_multi_pet_shortcut_tests PRIVATE
@@ -45,6 +53,21 @@ if(BUILD_TESTING)
   target_link_libraries(bongo_cat_image_filter_tests PRIVATE
     bongo_cat_runtime bongo_cat_warnings)
   add_test(NAME image-filter COMMAND bongo_cat_image_filter_tests)
+  add_executable(bongo_cat_image_png_stream_tests tests/media/test_image_png_stream.c)
+  target_include_directories(bongo_cat_image_png_stream_tests PRIVATE
+    src/media tests/support)
+  target_link_libraries(bongo_cat_image_png_stream_tests PRIVATE
+    bongo_cat_runtime bongo_cat_archive bongo_cat_warnings)
+  add_test(NAME image-png-stream COMMAND bongo_cat_image_png_stream_tests)
+  add_executable(bongo_cat_image_upload_fallback_tests
+    tests/media/test_image_upload_fallback.c)
+  target_include_directories(bongo_cat_image_upload_fallback_tests PRIVATE
+    src/media tests/support)
+  target_include_directories(bongo_cat_image_upload_fallback_tests SYSTEM PRIVATE
+    ${BONGO_CAT_STB_INCLUDE_DIR})
+  target_link_libraries(bongo_cat_image_upload_fallback_tests PRIVATE
+    bongo_cat_runtime bongo_cat_warnings)
+  add_test(NAME image-upload-fallback COMMAND bongo_cat_image_upload_fallback_tests)
   if(BONGO_CAT_CUBISM_ENABLED)
     add_executable(bongo_cat_overlay_layout_tests tests/media/test_overlay_layout.c)
     target_include_directories(bongo_cat_overlay_layout_tests PRIVATE tests/support)
@@ -230,6 +253,45 @@ if(BUILD_TESTING)
       bongo_cat_runtime bongo_cat_warnings)
     add_test(NAME live2d-core-profile COMMAND bongo_cat_core_profile_tests)
     set_tests_properties(live2d-core-profile PROPERTIES TIMEOUT 30)
+
+    add_executable(bongo_cat_render_resources_tests tests/live2d/test_render_resources.cpp)
+    target_include_directories(bongo_cat_render_resources_tests PRIVATE src/live2d tests/support)
+    target_link_libraries(bongo_cat_render_resources_tests PRIVATE
+      bongo_cat_runtime bongo_cat_warnings)
+    add_test(NAME live2d-render-resources COMMAND bongo_cat_render_resources_tests)
+    set_tests_properties(live2d-render-resources PROPERTIES TIMEOUT 30)
+
+    add_executable(bongo_cat_model_lifetime_tests tests/live2d/test_model_lifetime.cpp)
+    target_include_directories(bongo_cat_model_lifetime_tests PRIVATE src/live2d)
+    target_link_libraries(bongo_cat_model_lifetime_tests PRIVATE
+      bongo_cat_runtime bongo_cat_warnings)
+    target_compile_definitions(bongo_cat_model_lifetime_tests PRIVATE
+      BONGO_CAT_NATIVE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    bongo_cat_stage_cubism_assets(bongo_cat_model_lifetime_tests)
+    add_test(NAME live2d-model-lifetime COMMAND bongo_cat_model_lifetime_tests)
+    set_tests_properties(live2d-model-lifetime PROPERTIES TIMEOUT 60)
+
+    add_executable(bongo_cat_texture_sharing_tests tests/live2d/test_texture_sharing.cpp)
+    target_include_directories(bongo_cat_texture_sharing_tests PRIVATE src/live2d)
+    target_include_directories(bongo_cat_texture_sharing_tests SYSTEM PRIVATE
+      ${BONGO_CAT_STB_INCLUDE_DIR})
+    target_link_libraries(bongo_cat_texture_sharing_tests PRIVATE
+      bongo_cat_runtime bongo_cat_warnings)
+    target_compile_definitions(bongo_cat_texture_sharing_tests PRIVATE
+      BONGO_CAT_NATIVE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    bongo_cat_stage_cubism_assets(bongo_cat_texture_sharing_tests)
+    add_test(NAME live2d-texture-sharing COMMAND bongo_cat_texture_sharing_tests)
+    set_tests_properties(live2d-texture-sharing PROPERTIES TIMEOUT 60)
+
+    add_executable(bongo_cat_texture_equivalence_tests
+      tests/live2d/test_texture_equivalence.cpp)
+    target_link_libraries(bongo_cat_texture_equivalence_tests PRIVATE
+      bongo_cat_runtime bongo_cat_warnings)
+    target_compile_definitions(bongo_cat_texture_equivalence_tests PRIVATE
+      BONGO_CAT_NATIVE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    bongo_cat_stage_cubism_assets(bongo_cat_texture_equivalence_tests)
+    add_test(NAME live2d-texture-equivalence COMMAND bongo_cat_texture_equivalence_tests)
+    set_tests_properties(live2d-texture-equivalence PROPERTIES TIMEOUT 180)
 
     add_test(NAME model-startup-recovery COMMAND ${CMAKE_COMMAND}
       "-DEXECUTABLE=$<TARGET_FILE:bongo_cat_preferences_lifecycle_tests>"

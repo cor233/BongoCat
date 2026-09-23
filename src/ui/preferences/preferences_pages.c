@@ -9,6 +9,9 @@
 #include "bongo_cat/preferences.h"
 #include "bongo_cat/tray.h"
 #include "runtime.h"
+#ifdef _WIN32
+#include "windows_game_compatibility.h"
+#endif
 
 #include <SDL3/SDL.h>
 #include <stdio.h>
@@ -30,10 +33,27 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
         "pages.preference.cat.labels.windowSettings",
         "Window"),
         BONGO_CAT_PREF_ICON_SECTION_WINDOW);
-    bongo_cat_ui_question_tooltip(context, tr(app,
-        "pages.preference.cat.hints.gameInput", "Pet not responding in games?"),
-        tr(app, "pages.preference.cat.hints.gameInputHelp",
-            "Try running BongoCat as administrator and setting the game to windowed mode."));
+#ifdef _WIN32
+    bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_ADMINISTRATOR);
+    bool game_compatibility = app->settings.app.game_compatibility;
+    if (bongo_cat_pref_toggle_help(context, "game-compatibility", tr(app,
+        "pages.preference.general.labels.gameCompatibility", "Game Compatibility Mode"),
+        tr(app, "pages.preference.cat.hints.gameCompatibility",
+            "Enable when the desktop pet cannot respond in games."),
+        tr(app, "pages.preference.cat.hints.gameCompatibilityHelp",
+            "Enable to restart BongoCat with administrator privileges. Disable to return to normal privileges."),
+        &game_compatibility)) {
+        BongoCatError compatibility_error = {0};
+        if (!bongo_cat_windows_game_compatibility_set(app,
+                game_compatibility, &compatibility_error)) {
+            char message[1024];
+            snprintf(message, sizeof(message), "%s\n%s", tr(app,
+                "pages.preference.cat.hints.gameCompatibilityFailed",
+                "Unable to change game compatibility mode."), compatibility_error.message);
+            bongo_cat_preferences_notice_show(app, message, true);
+        }
+    }
+#endif
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_PASS_THROUGH);
     if (bongo_cat_pref_toggle(context, "pass-through", tr(app,
         "composables.useAppMenu.labels.passThrough", "Pass Through"), tr(app,
@@ -90,17 +110,19 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
         app->dirty = true;
     float old_scale = window_state->scale_percent;
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_WINDOW_SIZE);
-    bongo_cat_pref_float(context, "window-size", tr(app,
+    bool reset_position = bongo_cat_pref_float_action(context, "window-size", tr(app,
         "pages.preference.cat.labels.windowSize", "Window Size"), tr(app,
-        "composables.useAppMenu.labels.wheelSizeHint", "Wheel: resize"),
+        "pages.preference.cat.hints.windowSize", "[Scroll] to resize or [hold the right mouse button] and drag right to enlarge, left to shrink"),
         10.0f, &window_state->scale_percent, 500.0f, 1.0f,
-        BONGO_CAT_DEFAULT_WINDOW_SCALE_PERCENT);
+        BONGO_CAT_DEFAULT_WINDOW_SCALE_PERCENT, tr(app,
+            "pages.preference.cat.labels.resetPosition", "Reset"));
     if (old_scale != window_state->scale_percent && old_scale > 0.0f) {
         float requested_scale = window_state->scale_percent;
         window_state->scale_percent = old_scale;
         bongo_cat_window_cancel_wheel_animation(app);
         bongo_cat_window_set_scale(app, requested_scale);
     }
+    if (reset_position) bongo_cat_window_reset_position(app);
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_WINDOW_CORNERS);
     /* Display the fraction of maximum rounding; keep saved radii in their
        original units (percent of the short edge) for existing settings. */
@@ -183,7 +205,8 @@ static void page_display(BongoCatApp *app, struct nk_context *context) {
     }
     bongo_cat_pref_row_icon(context, BONGO_CAT_PREF_ICON_MAX_FPS);
     model->max_fps = bongo_cat_pref_fps(context, "max-fps", tr(app,
-        "pages.preference.cat.labels.maxFPS", "Max Frame Rate"), model->max_fps);
+        "pages.preference.cat.labels.maxFPS", "Max Frame Rate"), model->max_fps,
+        app->startup_display_fps);
 }
 
 static void update_autostart(BongoCatApp *app, bool old_value, bool old_admin) {

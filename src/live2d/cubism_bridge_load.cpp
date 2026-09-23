@@ -9,22 +9,6 @@
 #include <exception>
 #include <new>
 
-static void retire_previous(BongoCatLive2D *runtime,
-    bongo_cat::NativeModel *previous) {
-    if (!runtime || !previous) return;
-    if (runtime->retired_count == runtime->retired_capacity) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_VIDEO,
-            "Live2D retirement queue reached its limit; releasing the oldest model");
-        delete runtime->retired[0].model;
-        for (unsigned i = 1; i < runtime->retired_count; ++i)
-            runtime->retired[i - 1] = runtime->retired[i];
-        runtime->retired_count--;
-    }
-    BongoCatRetiredModel *slot = &runtime->retired[runtime->retired_count++];
-    slot->model = previous;
-    slot->frames_remaining = 3;
-}
-
 extern "C" BongoCatResult bongo_cat_live2d_load(BongoCatLive2D *runtime,
     const char *directory, const char *setting, bool preset,
     const BongoCatLive2DRenderOptions *render_options,
@@ -61,12 +45,18 @@ extern "C" BongoCatResult bongo_cat_live2d_load(BongoCatLive2D *runtime,
             (void *)SDL_GL_GetCurrentContext(), (unsigned)ready_error);
         if (progress) progress(userdata, 1.0f);
         runtime->model = model;
-        retire_previous(runtime, previous);
-        SDL_Log("[runtime] Live2D resource handoff: stage=retirement-queued "
-            "previous=%d previous_textures=%zu queue=%u frames=%u",
-            previous != nullptr,
-            previous ? previous->texture_count() : 0, runtime->retired_count,
-            previous ? 3u : 0u);
+        const size_t released_textures = previous ? previous->texture_count() : 0;
+        // Loading and drawing use the same GL context. GL deletion preserves
+        // already submitted draws; future frames only use the replacement.
+        // Release now even when a hidden/minimized window never draws again.
+        if (previous) {
+            delete previous;
+            // Submit any queued work so driver-side releases can finish even
+            // when this switch is followed by no draws or buffer swaps.
+            glFlush();
+        }
+        SDL_Log("[runtime] Live2D resource handoff: stage=previous-released "
+            "texture_refs=%zu", released_textures);
         GLenum retired_error = glGetError();
         SDL_Log("[runtime] Live2D resource handoff: stage=complete "
             "new_textures=%zu current_window=%p current_context=%p gl_error=0x%x",

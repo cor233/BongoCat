@@ -98,6 +98,7 @@ static bool read_app(yyjson_val *object, BongoCatApplicationPreferences *value,
     BongoCatError *error) {
     if (!read_bool(object, "launchAtLogin", &value->autostart, error) ||
         !read_bool(object, "launchAtLoginAsAdmin", &value->autostart_admin, error) ||
+        !read_bool(object, "gameCompatibility", &value->game_compatibility, error) ||
         !read_bool(object, "showTrayIcon", &value->tray_visible, error))
         return false;
     const char *text;

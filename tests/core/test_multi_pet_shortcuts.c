@@ -68,6 +68,62 @@ int main(void) {
         key(app, "KeyM", false, true);
         key(app, "ControlLeft", false, true);
         CHECK(app->settings.model.mirror == (p == 0));
+        for (unsigned i = 0; i < 3; ++i) {
+            app->settings.behavior_shortcuts[i].shortcut_disabled = false;
+            snprintf(app->settings.behavior_shortcuts[i].shortcut,
+                sizeof(app->settings.behavior_shortcuts[i].shortcut), "J+K");
+            triggered[p][i] = 0;
+        }
+        snprintf(app->settings.shortcuts.mirror,
+            sizeof(app->settings.shortcuts.mirror), "J+K");
+        app->settings.model.mirror = false;
+        key(app, "KeyK", true, true);
+        key(app, "KeyK", false, true);
+        for (unsigned i = 0; i < 3; ++i) CHECK(triggered[p][i] == 0);
+        CHECK(!app->settings.model.mirror);
+        /* Test application commands separately from model dispatch priority. */
+        key(app, "KeyJ", true, true);
+        key(app, "KeyK", true, true);
+        CHECK(app->settings.model.mirror == (p == 0));
+        key(app, "KeyK", false, true);
+        key(app, "KeyJ", false, true);
+        app->settings.shortcuts.mirror[0] = '\0';
+        for (unsigned i = 0; i < 3; ++i) triggered[p][i] = 0;
+        for (int reverse = 0; reverse < 2; ++reverse) {
+            const char *first = reverse ? "KeyK" : "KeyJ";
+            const char *second = reverse ? "KeyJ" : "KeyK";
+            key(app, first, true, true);
+            for (unsigned i = 0; i < 3; ++i) CHECK(triggered[p][i] == (unsigned)reverse);
+            key(app, second, true, true);
+            key(app, first, true, true);
+            key(app, second, true, true);
+            for (unsigned i = 0; i < 3; ++i) CHECK(triggered[p][i] == (unsigned)reverse + 1);
+            key(app, first, false, true);
+            key(app, second, false, true);
+        }
+        /* Explicit bindings and disabled bindings suppress the old Alt+number aliases. */
+        app->settings.behavior_shortcuts[1].shortcut_disabled = true;
+        key(app, "Alt", true, true);
+        key(app, "Num1", true, true);
+        key(app, "Num1", false, true);
+        key(app, "Num2", true, true);
+        key(app, "Num2", false, true);
+        key(app, "Alt", false, true);
+        for (unsigned i = 0; i < 3; ++i) CHECK(triggered[p][i] == 2);
+        app->settings.behavior_shortcuts[1].shortcut_disabled = false;
+        key(app, "KeyJ", true, false);
+        key(app, "KeyK", true, false);
+        key(app, "KeyX", true, true);
+        key(app, "KeyX", false, true);
+        for (unsigned i = 0; i < 3; ++i) CHECK(triggered[p][i] == 2);
+        key(app, "KeyK", false, false);
+        key(app, "KeyJ", false, false);
+        key(app, "KeyK", true, true);
+        key(app, "KeyJ", true, true);
+        for (unsigned i = 0; i < 3; ++i) CHECK(triggered[p][i] == 3);
+        key(app, "KeyK", false, true);
+        key(app, "KeyJ", false, true);
+        CHECK(bongo_cat_app_shortcut_conflicts(app, "K+J", app->settings.shortcuts.mirror));
         bongo_cat_behaviors_clear(&app->behaviors);
     }
     free(pets);

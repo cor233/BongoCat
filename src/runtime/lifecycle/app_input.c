@@ -95,6 +95,22 @@ void bongo_cat_app_log_input(BongoCatApp *app, bool flush) {
     app->input_diagnostics.hands_seen = 0;
 }
 
+static void suppress_shortcut(BongoCatApp *app, const BongoCatInputEvent *event) {
+    bongo_cat_shortcut_update(&app->shortcut_state, event);
+    if (!bongo_cat_sound_shortcut_update(&app->sound_shortcut_state, event)) return;
+    for (size_t i = 0; i < app->behaviors.count; ++i) {
+        BongoCatBehaviorEntry *entry = &app->behaviors.entries[i];
+        const BongoCatBehaviorShortcut *binding = bongo_cat_app_behavior_binding(app, entry->id);
+        bool down = binding && !binding->shortcut_disabled &&
+            bongo_cat_sound_shortcut_down(&app->sound_shortcut_state, binding->shortcut);
+        if (!down && entry->shortcut_active && entry->momentary &&
+            entry->kind == BONGO_CAT_BEHAVIOR_EFFECT)
+            bongo_cat_overlay_effect(app->overlay, NULL);
+        /* Consume held chords without running them after a modal dialog closes. */
+        entry->shortcut_active = down;
+    }
+}
+
 void bongo_cat_app_drain_input(BongoCatApp *app, bool allow_shortcuts) {
     BongoCatInputEvent event;
     while (bongo_cat_input_pop(&app->input, &event)) {
@@ -118,11 +134,7 @@ void bongo_cat_app_drain_input(BongoCatApp *app, bool allow_shortcuts) {
         else {
             /* Suppress actions, not key transitions: releases may arrive
                while a shortcut is being recorded or a modal menu is open. */
-            bongo_cat_shortcut_update(&app->shortcut_state, &event);
-            if (app->sound_shortcut_state.count) {
-                app->sound_shortcut_state.count = 0;
-                bongo_cat_app_reset_sound_bindings(app);
-            }
+            suppress_shortcut(app, &event);
         }
         bongo_cat_app_apply_input(app, &event);
     }
@@ -131,7 +143,7 @@ void bongo_cat_app_drain_input(BongoCatApp *app, bool allow_shortcuts) {
         if (allow_shortcuts &&
             !bongo_cat_preferences_shortcuts_blocked(app->preferences))
             bongo_cat_app_shortcuts(app, &event);
-        else bongo_cat_shortcut_update(&app->shortcut_state, &event);
+        else suppress_shortcut(app, &event);
         bongo_cat_app_apply_input(app, &event);
     }
     if (!app->smoke_ignore_global_input) bongo_cat_app_apply_mouse(app);

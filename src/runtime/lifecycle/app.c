@@ -7,13 +7,31 @@
 #include "bongo_cat/preferences.h"
 #include "bongo_cat/tray.h"
 #include <SDL3/SDL_opengl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 static void scan_models(BongoCatApp *app) {
     bongo_cat_app_rescan_models(app);
 }
+static void cache_startup_display_fps(BongoCatApp *app) {
+    /* Read only the active desktop mode, once after restoring pet position. */
+    SDL_DisplayID display = SDL_GetDisplayForWindow(app->window);
+    if (!display) display = SDL_GetPrimaryDisplay();
+    const SDL_DisplayMode *mode = display ? SDL_GetCurrentDisplayMode(display) : NULL;
+    app->startup_display_fps = BONGO_CAT_DEFAULT_MAX_FPS;
+    if (mode) {
+        double rounded = (double)mode->refresh_rate + 0.5;
+        if (rounded >= 61.0 && rounded < (double)INT_MAX)
+            app->startup_display_fps = (int)rounded;
+    }
+}
 static bool load_selected_model(BongoCatApp *app, BongoCatError *error) {
+    if (!app->models.count && !app->secondary_pet) {
+        app->startup_visibility_pending = false;
+        bongo_cat_window_set_visible(app, false);
+        return true;
+    }
     const char *candidates[] = {app->session.active_model_id, "standard", "keyboard", "gamepad"};
     for (size_t i = 0; i < 4; ++i) {
         bool duplicate = false;
@@ -28,16 +46,6 @@ static bool load_selected_model(BongoCatApp *app, BongoCatError *error) {
     }
     for (size_t i = 0; i < app->models.count; ++i)
         if (bongo_cat_app_select_model(app, app->models.entries[i].id)) return true;
-    /* Stored built-ins may themselves be damaged. Retry the packaged assets
-       before treating a model failure as a startup failure. */
-    if (bongo_cat_model_catalog_add_bundled(app, true)) {
-        for (size_t i = 1; i < 4; ++i)
-            if (bongo_cat_app_select_model(app, candidates[i])) {
-                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "Recovered startup using bundled model %s", candidates[i]);
-                return true;
-            }
-    }
     bongo_cat_error_set(error, BONGO_CAT_ERROR_CUBISM,
         "No usable Live2D model could be loaded");
     return false;
@@ -96,6 +104,7 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
     bongo_cat_startup_stage(app, "window-ready");
     if (bongo_cat_platform_init(&app->platform, app->window, &app->input, error) != BONGO_CAT_OK) return false;
     bongo_cat_window_apply(app);
+    cache_startup_display_fps(app);
     bongo_cat_startup_stage(app, "platform-ready");
     app->live2d = bongo_cat_live2d_create(app->asset_root, error);
     if (!app->live2d) return false;
@@ -135,7 +144,8 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
             "The update checker could not be initialized");
     bongo_cat_update_start_automatic(app->update);
-    if (!app->secondary_pet && !app->tray && !app->session.window.visible) {
+    if (!app->secondary_pet && !app->tray && app->models.count &&
+        !app->session.window.visible) {
         bongo_cat_window_set_visible(app, true);
     }
     bongo_cat_live2d_audit_run(app);
@@ -162,7 +172,8 @@ bool bongo_cat_app_initialize(BongoCatApp *app, int argc, char **argv,
             bongo_cat_startup_ci_failure(app, &menu_error);
         }
     }
-    if (app->smoke_preferences) bongo_cat_preferences_show(app->preferences);
+    if (app->smoke_preferences || !app->models.count)
+        bongo_cat_preferences_show(app->preferences);
     app->last_frame_ns = SDL_GetTicksNS();
     app->dirty = true;
     app->startup_raise_due_ns = !app->secondary_pet && !app->smoke &&

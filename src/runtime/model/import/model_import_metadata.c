@@ -103,7 +103,14 @@ void bongo_cat_import_apply_metadata(BongoCatApp *app, const char *model_id,
         BongoCatBehaviorShortcut *value =
             &app->settings.behavior_shortcuts[app->settings.behavior_shortcut_count++];
         snprintf(value->id, sizeof(value->id), "%s", id);
-        snprintf(value->shortcut, sizeof(value->shortcut), "%s", shortcut);
+        if (strlen(shortcut) >= sizeof(value->shortcut) ||
+            (*shortcut && !bongo_cat_shortcut_equal(shortcut, shortcut))) {
+            /* Never import a truncated prefix as a different, shorter chord. */
+            value->shortcut[0] = '\0';
+            value->shortcut_disabled = true;
+        } else {
+            snprintf(value->shortcut, sizeof(value->shortcut), "%s", shortcut);
+        }
         if (label) snprintf(value->label, sizeof(value->label), "%s", label);
     }
     yyjson_doc_free(document);

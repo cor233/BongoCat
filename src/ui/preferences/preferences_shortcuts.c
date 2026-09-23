@@ -21,6 +21,16 @@ bool bongo_cat_preferences_shortcut_active(const BongoCatPreferences *value,
 }
 
 static void finish(BongoCatPreferences *value) {
+    if (value->shortcut_target && value->shortcut_target[0] &&
+        strcmp(value->shortcut_target, value->shortcut_original) &&
+        bongo_cat_app_shortcut_conflicts(value->app, value->shortcut_target,
+            value->shortcut_target)) {
+        snprintf(value->shortcut_target, (size_t)value->shortcut_capacity, "%s",
+            value->shortcut_original);
+        bongo_cat_preferences_notice_show(value->app, tr(value,
+            "components.shortcut.hints.alreadyUsed",
+            "This shortcut is already in use."), true);
+    }
     if (value->shortcut_target && strcmp(value->shortcut_target, value->shortcut_original)) {
         BongoCatBehaviorShortcut *binding = bongo_cat_app_behavior_binding_target(
             value->app, value->shortcut_target);
@@ -137,7 +147,7 @@ static bool capture_key(BongoCatPreferences *value,
     const SDL_KeyboardEvent *event) {
     if (event->repeat) return true;
     if (!event->down) {
-        if (value->shortcut_key != SDLK_UNKNOWN && event->key == value->shortcut_key)
+        if (value->shortcut_key != SDLK_UNKNOWN)
             finish(value);
         return true;
     }
@@ -148,23 +158,49 @@ static bool capture_key(BongoCatPreferences *value,
         value->shortcut_target[0] = '\0'; value->shortcut_key = event->key;
         value->render_dirty = true; return true;
     }
-    if (modifier_key(event->key)) return true;
+    if (modifier_key(event->key)) {
+        if (value->shortcut_key != SDLK_UNKNOWN && value->shortcut_target[0]) {
+            const char *token = event->key == SDLK_LCTRL || event->key == SDLK_RCTRL
+                ? "Control" : event->key == SDLK_LSHIFT || event->key == SDLK_RSHIFT
+                ? "Shift" : event->key == SDLK_LALT || event->key == SDLK_RALT
+                ? "Alt" : "Meta";
+            /* A modifier pressed after the ordinary key is still part of the chord. */
+            if (!strstr(value->shortcut_target, token)) {
+                if (strlen(value->shortcut_target) + strlen(token) + 2 >
+                    (size_t)value->shortcut_capacity) {
+                    bongo_cat_preferences_shortcut_cancel(value);
+                    return true;
+                }
+                append(value->shortcut_target, (size_t)value->shortcut_capacity, token);
+            }
+            value->render_dirty = true;
+        }
+        return true;
+    }
     char primary[24]; const char *key = primary_name(event->key, primary);
-    if (!key) return true;
+    if (!key) {
+        /* An unsupported key must not silently shorten the recorded chord. */
+        bongo_cat_preferences_shortcut_cancel(value);
+        return true;
+    }
     char shortcut[BONGO_CAT_SHORTCUT_CAP] = {0};
-    if (event->mod & SDL_KMOD_CTRL) append(shortcut, sizeof(shortcut), "Control");
-    if (event->mod & SDL_KMOD_SHIFT) append(shortcut, sizeof(shortcut), "Shift");
-    if (event->mod & SDL_KMOD_ALT) append(shortcut, sizeof(shortcut), "Alt");
-    if (event->mod & SDL_KMOD_GUI) append(shortcut, sizeof(shortcut), "Meta");
+    if (value->shortcut_key != SDLK_UNKNOWN && value->shortcut_target[0]) {
+        /* Keep every ordinary key until the first key is released. */
+        snprintf(shortcut, sizeof(shortcut), "%s", value->shortcut_target);
+    } else {
+        if (event->mod & SDL_KMOD_CTRL) append(shortcut, sizeof(shortcut), "Control");
+        if (event->mod & SDL_KMOD_SHIFT) append(shortcut, sizeof(shortcut), "Shift");
+        if (event->mod & SDL_KMOD_ALT) append(shortcut, sizeof(shortcut), "Alt");
+        if (event->mod & SDL_KMOD_GUI) append(shortcut, sizeof(shortcut), "Meta");
+    }
+    size_t needed = strlen(shortcut) + (shortcut[0] ? 1 : 0) + strlen(key) + 1;
+    if (needed > sizeof(shortcut) || needed > (size_t)value->shortcut_capacity) {
+        bongo_cat_preferences_shortcut_cancel(value);
+        return true;
+    }
     append(shortcut, sizeof(shortcut), key);
-    if (bongo_cat_app_shortcut_conflicts(value->app, shortcut,
-        value->shortcut_target)) {
-        snprintf(value->shortcut_target, (size_t)value->shortcut_capacity, "%s",
-            value->shortcut_original);
-        bongo_cat_preferences_notice_show(value->app, tr(value,
-            "components.shortcut.hints.alreadyUsed",
-            "This shortcut is already in use."), true);
-        finish(value);
+    if (!bongo_cat_shortcut_equal(shortcut, shortcut)) {
+        bongo_cat_preferences_shortcut_cancel(value);
         return true;
     }
     snprintf(value->shortcut_target, (size_t)value->shortcut_capacity, "%s", shortcut);

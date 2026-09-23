@@ -2,6 +2,34 @@
 
 #include <string.h>
 
+void bongo_cat_image_alpha_mask_rows(const BongoCatImage *rows, int height,
+    int y_begin, BongoCatImageAlphaMask *mask) {
+    if (!mask) return;
+    if (!y_begin) {
+        memset(mask, 0, sizeof(*mask));
+        mask->width = rows->width < BONGO_CAT_ALPHA_MASK_SIZE ?
+            rows->width : BONGO_CAT_ALPHA_MASK_SIZE;
+        mask->height = height < BONGO_CAT_ALPHA_MASK_SIZE ?
+            height : BONGO_CAT_ALPHA_MASK_SIZE;
+    }
+    for (int row = 0; row < rows->height; ++row) {
+        int target_y = (int)((int64_t)(y_begin + row) * mask->height / height);
+        for (int target_x = 0; target_x < mask->width; ++target_x) {
+            unsigned char *maximum = mask->pixels +
+                (size_t)target_y * mask->width + target_x;
+            if (*maximum == 255) continue;
+            int x_begin = (int)(((int64_t)target_x * rows->width +
+                mask->width - 1) / mask->width);
+            int x_end = (int)(((int64_t)(target_x + 1) * rows->width +
+                mask->width - 1) / mask->width);
+            const unsigned char *pixel = rows->pixels +
+                ((size_t)row * rows->width + x_begin) * 4 + 3;
+            for (int x = x_begin; x < x_end && *maximum < 255; ++x, pixel += 4)
+                if (*pixel > *maximum) *maximum = *pixel;
+        }
+    }
+}
+
 void bongo_cat_image_make_alpha_mask_progress(const BongoCatImage *image,
     BongoCatImageAlphaMask *mask, BongoCatImageProgress progress,
     void *userdata) {

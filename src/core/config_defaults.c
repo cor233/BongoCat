@@ -1,7 +1,7 @@
 #include "bongo_cat/config.h"
 #include "bongo_cat/utf8.h"
+#include "bongo_cat/sound_shortcut.h"
 
-#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -9,15 +9,6 @@
 static float clampf_or(float value, float low, float high, float fallback) {
     if (!isfinite(value)) return fallback;
     return value < low ? low : value > high ? high : value;
-}
-
-static bool shortcut_equal(const char *left, const char *right) {
-    if (!left || !right || !left[0] || !right[0]) return false;
-    while (*left && *right) {
-        if (tolower((unsigned char)*left++) != tolower((unsigned char)*right++))
-            return false;
-    }
-    return *left == *right;
 }
 
 static bool normalize_text(char *text, size_t capacity) {
@@ -39,7 +30,7 @@ bool bongo_cat_settings_shortcut_conflicts(const BongoCatSettings *config,
         config->shortcuts.pass_through, config->shortcuts.always_on_top,
         config->shortcuts.open_menu};
     for (size_t i = 0; i < sizeof(global) / sizeof(global[0]); ++i)
-        if (global[i] != exclude && shortcut_equal(global[i], shortcut))
+        if (global[i] != exclude && bongo_cat_shortcut_equal(global[i], shortcut))
             return true;
     size_t behavior_count = config->behavior_shortcut_count;
     if (behavior_count > BONGO_CAT_BEHAVIOR_BINDING_CAP)
@@ -48,8 +39,10 @@ bool bongo_cat_settings_shortcut_conflicts(const BongoCatSettings *config,
     for (size_t i = 0; i < behavior_count; ++i)
         if (config->behavior_shortcuts[i].shortcut == exclude) return false;
     for (size_t i = 0; i < behavior_count; ++i) {
+        if (config->behavior_shortcuts[i].shortcut_disabled ||
+            config->behavior_shortcuts[i].shortcut_external) continue;
         const char *bound = config->behavior_shortcuts[i].shortcut;
-        if (shortcut_equal(bound, shortcut)) return true;
+        if (bongo_cat_shortcut_equal(bound, shortcut)) return true;
     }
     return false;
 }
@@ -62,7 +55,7 @@ static void validate_shortcuts(BongoCatSettings *config) {
     for (size_t i = 0; i < sizeof(global) / sizeof(global[0]); ++i) {
         normalize_text(global[i], BONGO_CAT_SHORTCUT_CAP);
         for (size_t j = 0; j < i; ++j)
-            if (shortcut_equal(global[i], global[j]))
+            if (bongo_cat_shortcut_equal(global[i], global[j]))
                 memset(global[i], 0, BONGO_CAT_SHORTCUT_CAP);
     }
     for (size_t i = 0; i < config->behavior_shortcut_count; ++i) {
@@ -70,7 +63,7 @@ static void validate_shortcuts(BongoCatSettings *config) {
         char *shortcut = config->behavior_shortcuts[i].shortcut;
         bool duplicate = false;
         for (size_t j = 0; j < sizeof(global) / sizeof(global[0]); ++j)
-            duplicate = duplicate || shortcut_equal(shortcut, global[j]);
+            duplicate = duplicate || bongo_cat_shortcut_equal(shortcut, global[j]);
         if (duplicate) shortcut[0] = '\0';
     }
 }
@@ -88,7 +81,7 @@ static void compact_behavior_overrides(BongoCatSettings *config) {
         if (!bongo_cat_utf8_valid(entry.id) ||
             !bongo_cat_utf8_valid(entry.shortcut) ||
             !bongo_cat_utf8_valid(entry.label)) continue;
-        if (entry.shortcut[0]) entry.shortcut_disabled = false;
+        /* An explicit disabled flag must survive validation and a save/reload. */
         if (!entry.id[0] || (!entry.shortcut[0] && !entry.label[0] && !entry.shortcut_disabled)) continue;
         BongoCatBehaviorShortcut canonical = {0};
         canonical.shortcut_disabled = entry.shortcut_disabled;
@@ -209,6 +202,7 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
     config->window.random_motion_interval_seconds =
         BONGO_CAT_DEFAULT_RANDOM_MOTION_SECONDS;
     config->app.tray_visible = true;
+    config->app.game_compatibility = false;
     config->app.theme = BONGO_CAT_THEME_AUTO;
     config->app.language = BONGO_CAT_LANG_EN_US;
     memcpy(config->extensions_json, "{}", sizeof("{}"));
@@ -216,8 +210,9 @@ void bongo_cat_settings_defaults(BongoCatSettings *config) {
 
 void bongo_cat_settings_validate(BongoCatSettings *config) {
     if (!config) return;
-    config->model.max_fps = config->model.max_fps > 0 &&
-        config->model.max_fps <= 30 ? 30 : BONGO_CAT_DEFAULT_MAX_FPS;
+    if (config->model.max_fps != BONGO_CAT_DISPLAY_MAX_FPS)
+        config->model.max_fps = config->model.max_fps > 0 &&
+            config->model.max_fps <= 30 ? 30 : BONGO_CAT_DEFAULT_MAX_FPS;
     config->window.hide_delay_seconds = clampf_or(
         config->window.hide_delay_seconds, 0.0f, 60.0f, 0.0f);
     config->window.hide_fade_seconds = clampf_or(

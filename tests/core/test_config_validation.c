@@ -56,8 +56,8 @@ static void check_defaults_and_validation(void) {
     bongo_cat_settings_validate(&settings);
     bongo_cat_session_validate(&session);
     CHECK(settings.model.max_fps == 60);
-    const int old_fps[] = {-1, 0, 1, 24, 30, 31, 60, 120, 240};
-    const int new_fps[] = {60, 60, 30, 30, 30, 60, 60, 60, 60};
+    const int old_fps[] = {-2, BONGO_CAT_DISPLAY_MAX_FPS, 0, 1, 24, 30, 31, 60, 120, 240};
+    const int new_fps[] = {60, BONGO_CAT_DISPLAY_MAX_FPS, 60, 30, 30, 30, 60, 60, 60, 60};
     for (size_t i = 0; i < sizeof(old_fps) / sizeof(old_fps[0]); ++i) {
         settings.model.max_fps = old_fps[i];
         bongo_cat_settings_validate(&settings);
@@ -132,6 +132,7 @@ static void check_shortcuts(void) {
     CHECK(strcmp(settings.behavior_shortcuts[0].id, "motion:1") == 0);
     CHECK(strcmp(settings.behavior_shortcuts[0].shortcut, "Control+M") == 0);
     CHECK(bongo_cat_settings_shortcut_conflicts(&settings, "control+b", NULL));
+    CHECK(bongo_cat_settings_shortcut_conflicts(&settings, "KeyB+Ctrl", NULL));
     CHECK(!bongo_cat_settings_shortcut_conflicts(&settings, "control+b",
         settings.shortcuts.toggle_pet_visibility));
 }
@@ -168,6 +169,10 @@ static void check_behavior_companions(void) {
         CHECK(!strcmp(loaded.behavior_shortcuts[i].shortcut, "Alt+O"));
     }
     CHECK(loaded.behavior_shortcuts[4].shortcut_disabled);
+    snprintf(loaded.behavior_shortcuts[4].shortcut, BONGO_CAT_SHORTCUT_CAP, "F24+F23");
+    bongo_cat_settings_validate(&loaded);
+    CHECK(loaded.behavior_shortcuts[4].shortcut_disabled);
+    CHECK(!bongo_cat_settings_shortcut_conflicts(&loaded, "F23+F24", NULL));
     CHECK(bongo_cat_file_remove("bongocat-audio-config-test.json"));
 }
 

@@ -160,7 +160,7 @@ static void draw_actions(BongoCatPreferences *value,
     struct nk_rect actions = nk_rect(bounds.x + 1, bounds.y + bounds.h - 39,
         bounds.w - 2, 38);
     nk_fill_rect(canvas, actions, 0, p.surface);
-    bool deletable = !entry->preset && !entry->managed;
+    bool deletable = !entry->managed;
     bool delete_enabled = deletable && !storage_busy;
     float width = actions.w / (deletable ? 3.0f : 2.0f);
     struct nk_rect items[3] = {

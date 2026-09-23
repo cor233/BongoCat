@@ -2,8 +2,8 @@
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
 #include <stb_image_resize2.h>
 
-#include "bongo_cat/gl_api.h"
 #include "bongo_cat/image.h"
+#include "image_internal.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_opengl.h>
@@ -34,27 +34,10 @@ static void apply_rounding(unsigned char *pixels, int width, int height,
     }
 }
 
-static GLuint upload(const unsigned char *pixels, int width, int height,
+static GLuint upload(unsigned char *pixels, int width, int height,
     BongoCatError *error) {
-    bongo_cat_gl_clear_errors();
-    GLuint texture = 0;
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA,
-        GL_UNSIGNED_BYTE, pixels);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
-    GLenum status = glGetError();
-    if (status == GL_NO_ERROR) return texture;
-    if (texture) glDeleteTextures(1, &texture);
-    bongo_cat_error_set(error, status == GL_OUT_OF_MEMORY
-        ? BONGO_CAT_ERROR_MEMORY : BONGO_CAT_ERROR_PLATFORM,
-        "OpenGL resampled texture upload failed (0x%x)", (unsigned)status);
-    return 0;
+    BongoCatImage image = {.pixels = pixels, .width = width, .height = height};
+    return bongo_cat_image_upload_texture(&image, 0, false, error);
 }
 
 unsigned int bongo_cat_image_texture_resampled(const char *path,

@@ -18,8 +18,12 @@ set(BONGO_CAT_MEDIA_SOURCES
   src/media/audio/audio_playback.c
   src/media/image.c
   src/media/image_decode.c
+  src/media/image_wic_stream.c
+  src/media/image_png_stream.c
   src/media/image_info.c
+  src/media/image_model.c
   src/media/image_mipmap.c
+  src/media/image_upload.c
   src/media/image_resize.c
   src/media/image_alpha.c
   src/media/stb_image_impl.c)

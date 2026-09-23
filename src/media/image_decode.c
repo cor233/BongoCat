@@ -71,12 +71,6 @@ BongoCatResult bongo_cat_image_decode_pixels_responsive(const char *path,
 }
 
 #ifdef _WIN32
-bool bongo_cat_image_needs_wic_scaling(const char *path, int limit) {
-    int width = 0, height = 0;
-    bool known = bongo_cat_image_info(path, &width, &height);
-    return !known || width > limit || height > limit;
-}
-
 static wchar_t *wide_path(const char *path) {
     int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
         path, -1, NULL, 0);

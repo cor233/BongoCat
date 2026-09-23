@@ -20,6 +20,22 @@ static void compatible_keyboard_bindings(void) {
         {"[91]", "Meta"}, {"[1]", "Left"}, {"[17,2]", "Control+Right"},
         {"[162,65]", "ControlLeft+A"}, {"[165]", "AltGr"},
         {"[144]", "NumLock"}, {"[124,219]", "F13+BracketLeft"},
+        {"[18,187]", "Alt+="},
+        {"[18,189]", "Alt+-"},
+        {"[18,219]", "Alt+BracketLeft"},
+        {"[18,221]", "Alt+BracketRight"},
+        {"[18,220]", "Alt+Backslash"},
+        {"[18,186]", "Alt+Semicolon"},
+        {"[18,222]", "Alt+Quote"},
+        {"[18,188]", "Alt+Comma"},
+        {"[18,190]", "Alt+Period"},
+        {"[18,191]", "Alt+Slash"},
+        {"[18,192]", "Alt+BackQuote"},
+        {"[18,107]", "Alt+KpPlus"},
+        {"[18,109]", "Alt+KpMinus"},
+        {"[18,106]", "Alt+KpMultiply"},
+        {"[18,111]", "Alt+KpDivide"},
+        {"[18,110]", "Alt+KpDecimal"},
         {"[0]", ""}, {"[255]", ""}
     };
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {

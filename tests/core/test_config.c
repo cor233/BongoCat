@@ -43,6 +43,8 @@ void test_config(void) {
     bongo_cat_settings_defaults(&settings);
     bongo_cat_session_defaults(&session);
     CHECK(!settings.window.pass_through);
+    CHECK(!settings.app.game_compatibility);
+    settings.app.game_compatibility = true;
     settings.model.max_fps = 30;
     settings.model.multiple_pets = true;
     settings.model.mirror = true;
@@ -99,6 +101,7 @@ void test_config(void) {
         BONGO_CAT_OK);
     CHECK(contains_text(settings_path, "\"format\": \"bongocat/settings\""));
     CHECK(contains_text(settings_path, "\"captureBackground\": true"));
+    CHECK(contains_text(settings_path, "\"gameCompatibility\": true"));
     CHECK(contains_text(settings_path, "\"randomExpression\": true"));
     CHECK(contains_text(settings_path,
         "\"randomExpressionIntervalSeconds\": 12.0"));
@@ -135,6 +138,7 @@ void test_config(void) {
     CHECK(loaded_settings.window.random_motion &&
         loaded_settings.window.random_motion_interval_seconds == 17.0f);
     CHECK(loaded_settings.app.language == BONGO_CAT_LANG_ZH_CN);
+    CHECK(loaded_settings.app.game_compatibility);
     CHECK(loaded_settings.model.gamepad_four_hands);
     CHECK(strstr(loaded_settings.extensions_json,
         "\"enabled\":true") != NULL);
@@ -164,7 +168,22 @@ void test_config(void) {
     CHECK(strcmp(loaded_session.active_behaviors[1].behavior_id,
         "model:expression:2") == 0);
 
+    settings.model.max_fps = BONGO_CAT_DISPLAY_MAX_FPS;
+    CHECK(bongo_cat_settings_save(settings_path, &settings, &error) == BONGO_CAT_OK);
+    CHECK(bongo_cat_settings_load(settings_path, &loaded_settings, &error) == BONGO_CAT_OK);
+    CHECK(loaded_settings.model.max_fps == BONGO_CAT_DISPLAY_MAX_FPS);
+
     const char *unsupported = "bongocat-unsupported.json";
+    write_text(unsupported,
+        "{\"format\":\"bongocat/settings\",\"schemaVersion\":1,"
+        "\"application\":{\"gameCompatibility\":false}}");
+    CHECK(bongo_cat_settings_load(unsupported, &loaded_settings, &error) == BONGO_CAT_OK);
+    CHECK(!loaded_settings.app.game_compatibility);
+    write_text(unsupported,
+        "{\"format\":\"bongocat/settings\",\"schemaVersion\":1,"
+        "\"application\":{\"gameCompatibility\":\"true\"}}");
+    CHECK(bongo_cat_settings_load(unsupported, &loaded_settings, &error) == BONGO_CAT_ERROR_FORMAT);
+    CHECK(!loaded_settings.app.game_compatibility);
     write_text(unsupported,
         "{\"format\":\"bongocat/settings\",\"schemaVersion\":1,"
         "\"rendering\":{\"gamepadFourHands\":false}}");
@@ -192,6 +211,7 @@ void test_config(void) {
     write_text(unsupported, "{\"format\":\"bongocat/settings\",\"schemaVersion\":1,\"rendering\":{\"inputReleaseDelaySeconds\":3,\"maximumFps\":30}}");
     CHECK(bongo_cat_settings_load(unsupported, &loaded_settings, &error) == BONGO_CAT_OK && loaded_settings.model.max_fps == 30);
     CHECK(!loaded_settings.model.gamepad_four_hands); /* older files omit the option */
+    CHECK(!loaded_settings.app.game_compatibility);
 
     write_text(unsupported,
         "{\"format\":\"bongocat/settings\",\"schemaVersion\":1,"
