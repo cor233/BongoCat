@@ -1,245 +1,408 @@
-# BongoCat
 
-`BongoCat` is a small native desktop overlay for Live2D models. It keeps a
-borderless, transparent window on the desktop and maps keyboard, mouse, and
-gamepad input to the model.
+<div align="center">
+  <a href="https://bongocat.pet" target="_blank">
+    <img src="https://github.com/user-attachments/assets/dd693432-8342-440b-8a92-c9f57a96ffb4" alt="Catime" width="249">
+  </a>
+  
+  <h1>
+    <a href="https://bongocat.pet" target="_blank" style="text-decoration: none; color: inherit;">BongoCat</a>
+  </h1>
+</div>
 
-This README is about the source tree and its build. It is not a user manual.
-The Windows build with the Live2D Cubism SDK is the reference build; the public
-CI jobs build and test the same program with a diagnostic renderer because the
-SDK is licensed and is not checked into this repository.
 
-## Current State
+<!-- Project Description + Rocket Icon -->
+<p align="center"> 
+ 💘C × SDL3 × OpenGL — Three Mysterious Forces, United as One! Bong~ Bongocat!!!
+</p>
+<p align="center">
+<a href="https://github.com/vladelaina/BongoCat/blob/main/README.md"><strong>English</strong></a> • <a href="https://github.com/vladelaina/BongoCat/blob/main/docs/README.zh-CN.md">简体中文</a> • <a href="https://github.com/vladelaina/BongoCat/blob/main/docs/README.zh-Hant.md">繁體中文</a> • <a href="https://github.com/vladelaina/BongoCat/blob/main/docs/README.fr-FR.md">Français</a> • <a href="https://github.com/vladelaina/BongoCat/blob/main/docs/README.de-DE.md">Deutsch</a> • <a href="https://github.com/vladelaina/BongoCat/blob/main/docs/README.ja-JP.md">日本語</a> • <a href="https://github.com/vladelaina/BongoCat/blob/main/docs/README.ko-KR.md">한국어</a> • <a href="https://github.com/vladelaina/BongoCat/blob/main/docs/README.pt-BR.md">Português</a> • <a href="https://github.com/vladelaina/BongoCat/blob/main/docs/README.ru-RU.md">Русский</a> • <a href="https://github.com/vladelaina/BongoCat/blob/main/docs/README.es-ES.md">Español</a> • <a href="https://github.com/vladelaina/BongoCat/blob/main/docs/README.id-ID.md">Bahasa Indonesia</a>
+</p>
+<p align="center">
+  <a href="https://github.com/vladelaina/BongoCat/blob/main/LICENSE"><img src="https://img.shields.io/badge/AGPL--3.0-1fa669?style=flat&logo=gnu&logoColor=white"></a>
+  <a href="https://github.com/vladelaina/BongoCat"><img src="https://img.shields.io/badge/C-54AEFF?style=flat&logo=c&logoColor=white"></a>
+<a href="https://discord.gg/vf8jqnattk"><img src="https://img.shields.io/badge/Discord-F77DAA?logo=discord&logoColor=white"></a>
+  <a href="https://github.com/vladelaina/BongoCat/blob/main/docs/wechat.md"><img src="https://img.shields.io/badge/WeChat-%2307C160?logo=wechat&logoColor=%2307C160&labelColor=FFFFFF"></a>
+  <a href="https://qm.qq.com/q/cYlRBbvuda"><img src="https://img.shields.io/badge/422616922-12B7F5?logo=qq&logoColor=12B7F5&labelColor=FFFFFF"></a>
+</p>
 
-The native application, bundled model packages, preferences, import path, and
-platform integrations are in this tree. The evidence ledger in
-[`docs/feature-audit.md`](docs/feature-audit.md) records what has been exercised
-on a real Windows Cubism build and what still needs a manual check on a
-particular operating system or device.
 
-Without Cubism, CMake selects a diagnostic backend. The application still
-starts, opens its preferences, processes input, and runs the native tests, but
-it cannot draw or animate a real Live2D model. Configure with
-`-DBONGO_CAT_REQUIRE_CUBISM=ON` when a missing SDK should be a configuration error
-instead of a diagnostic build.
+<!-- Demo Video -->
+<div align="center" style="margin-bottom: 30px;">
+  <video src="https://github.com/user-attachments/assets/75719230-9e49-4124-ae5a-8e35592c5d49
+" autoplay loop style="border-radius: 8px; max-width: 800px;"></video>
+</div>
 
-## Features
 
-- Standard, keyboard, and gamepad model modes, with three bundled model
-  packages.
-- Cubism `.model3.json` loading, textures, motions, expressions, physics, pose,
-  eye blink, and breath updates.
-- Import and removal of custom model packages. A package is checked for a valid
-  manifest and safe file references before it is installed under the user data
-  directory.
-- Automatic discovery of Bongo-Cat-Mver packages in the executable directory
-  or its immediate parent, shown separately as nearby models. Packages may use
-  `config.json` + `img/` directly or an intact child directory.
-- Mver 0.1.6 is the animation and input behavior baseline; standalone
-  Tauri/Live2D model folders are loaded through a canvas and input adapter.
-  Model containers with nested full packages and image-only variants (for
-  example `A-*` plus `Z-*` directories) are also discovered. The source stays
-  read-only and BongoCat caches only generated adapter files.
-- Keyboard and mouse input, pointer tracking, gamepad buttons and axes,
-  mirroring, automatic key release, and configurable shortcuts.
-- Optional keep-on-screen positioning, disabled by default. A fully unreachable
-  window is recovered after a display is disconnected, without polling or
-  interacting with fullscreen applications.
-- Transparent borderless window, click-through, always-on-top, hover hiding,
-  monitor clamping, scaling, opacity, tray integration, and Shift + right-drag
-  resizing.
-- Preferences, light/dark themes, and ten shipped locales: Simplified Chinese,
-  Traditional Chinese, English, French, German, Japanese, Korean, Brazilian
-  Portuguese, Russian, and Spanish.
+<img width="1149" height="904" alt="image" src="https://github.com/user-attachments/assets/aa376965-539e-4bbd-827d-bb9a29006069" />
 
-## How the Runtime Is Split
 
-The program is intentionally split at the points where the implementation has
-different ownership:
+> [!TIP]
+> The model featured in this demonstration is from [宇痕冫](https://space.bilibili.com/348616056).
+>
+> 🎁 Looking for **free** models? We work with talented model creators to bring you a wide variety of free models, while continuously exploring more fun desktop experiences! Visit our official website: [bongocat.pet](https://bongocat.pet/models)
+<p align="center">
+  <a href="https://bongocat.pet/models">
+    <img height="1080" src="https://github.com/user-attachments/assets/dedd83ca-742a-4f8c-a64a-69e659fca564" />
+  </a>
+</p>
+
+<p align="center">
+    <img src="https://count.getloli.com/@bongocat?name=bongocat&theme=booru-qualityhentais&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto" width="400">
+  </p>
+
+## 📥 Download
+
+<a href="https://apps.microsoft.com/detail/9p41mlsx72xw?referrer=appbadge" target="_self" >
+	<img src="https://get.microsoft.com/images/en-us%20light.svg" width="600"/>
+</a>
+
+- GitHub Releases
+
+  Download the latest release from [GitHub Releases](https://github.com/vladelaina/BongoCat/releases/latest).
+
+## 🛠️ Build From Source
+
+BongoCat uses CMake and requires a C11 compiler, a C++17 compiler, CMake 3.24
+or newer, and desktop OpenGL development files. SDL3, yyjson, stb, miniaudio,
+and Nuklear are downloaded at configure time by default, so the first
+configuration needs network access.
+
+Run the commands below from the project root (the directory containing
+`CMakeLists.txt`).
+
+### 📋 Platform Prerequisites
+
+- **Windows:** Visual Studio 2022 with the Desktop C++ workload and CMake.
+  Use the MSVC generator; MinGW can build the diagnostic backend but is not
+  supported for the Cubism SDK.
+- **macOS:** Xcode Command Line Tools, CMake, and Ninja. Select an architecture
+  with `CMAKE_OSX_ARCHITECTURES` when it differs from the host default.
+- **Linux (Debian/Ubuntu):** GCC or Clang, Ninja, and the OpenGL/X11 headers:
+
+  ```bash
+  sudo apt-get update
+  sudo apt-get install -y build-essential cmake ninja-build \
+    libgl1-mesa-dev libx11-dev libxi-dev libxfixes-dev libfontconfig1-dev fonts-noto-cjk
+  ```
+
+### 🔧 Configure and Build
+
+On Linux and macOS, use a single-configuration generator such as Ninja:
+
+```bash
+cmake -S . -B build -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBONGO_CAT_FETCH_DEPS=ON
+cmake --build build --parallel
+```
+
+On Windows, run from a Visual Studio 2022 developer shell (or another shell
+where MSVC is available):
+
+```powershell
+cmake -S . -B build -G "Visual Studio 17 2022" -A x64 `
+  -DBONGO_CAT_FETCH_DEPS=ON
+cmake --build build --config Release --parallel
+```
+
+The executable is written to `build/BongoCat` on Linux, to
+`build/BongoCat.app/Contents/MacOS/BongoCat` on macOS, and to
+`build/Release/BongoCat.exe` for Visual Studio builds.
+
+### 🧪 Tests
+
+CTest targets are enabled by default. Run them after building:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+For a multi-configuration generator such as Visual Studio, select the build
+configuration explicitly:
+
+```powershell
+ctest --test-dir build -C Release --output-on-failure
+```
+
+### 🎭 Live2D / Cubism SDK (Optional)
+
+If the Cubism SDK is not present, CMake emits a warning and builds the
+diagnostic backend. This backend is intended for startup and platform
+diagnostics; it does not provide Live2D model rendering. To build the full
+runtime, install a compatible Cubism SDK for Native and either place it at
+`vendor/CubismSdkForNative` or pass its location explicitly:
+
+```bash
+cmake -S . -B build -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBONGO_CAT_CUBISM_SDK=/path/to/CubismSdkForNative \
+  -DBONGO_CAT_REQUIRE_CUBISM=ON
+```
+
+The SDK must contain its Core library, Framework sources, and the OpenGL GLEW
+third-party tree in the layout expected by `cmake/Cubism.cmake`. Windows
+Cubism builds require Visual Studio 2022. `BONGO_CAT_REQUIRE_CUBISM=ON` makes
+configuration fail instead of silently selecting the diagnostic backend.
+
+### ⚙️ CMake Options
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `BONGO_CAT_FETCH_DEPS` | `ON` | Download the pinned third-party dependencies with CMake `FetchContent`. Set `OFF` only when SDL3, yyjson, stb, miniaudio, and Nuklear are already available to CMake. |
+| `BONGO_CAT_CUBISM_SDK` | `vendor/CubismSdkForNative` | Path to the Cubism SDK for Native. |
+| `BONGO_CAT_REQUIRE_CUBISM` | `OFF` | Fail configuration when a usable Cubism SDK is unavailable. |
+| `BONGO_CAT_WARNINGS_AS_ERRORS` | `OFF` | Treat native compiler warnings as errors. |
+
+For an offline build with `BONGO_CAT_FETCH_DEPS=OFF`, provide CMake package
+configurations for SDL3 (including `SDL3-static`) and yyjson, plus the include
+directories for stb, Nuklear, and miniaudio when they are not discoverable:
+
+```bash
+cmake -S . -B build -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBONGO_CAT_FETCH_DEPS=OFF \
+  -DBONGO_CAT_STB_INCLUDE_DIR=/path/to/stb \
+  -DBONGO_CAT_NUKLEAR_INCLUDE_DIR=/path/to/nuklear \
+  -DBONGO_CAT_MINIAUDIO_INCLUDE_DIR=/path/to/miniaudio
+```
+
+## 📌 Project Status
+
+
+## 📜 License
+
+The BongoCat source code and native runtime are licensed under
+[AGPL-3.0-only](LICENSE).
+
+The default built-in model mode (`standard`) remains MIT-licensed. The
+bundled model assets in `resources/assets/models/standard`, `keyboard`, and
+`gamepad` are covered by the separate [MIT license notice](LICENSE-MIT).
+That MIT license applies to the model assets and their accompanying artwork
+only; it does not relicense the BongoCat source code or native runtime.
+
+
+## 🧭 Technical Architecture
+
+> The current native version is built on C/C++, SDL3, and OpenGL. The diagram below focuses on the runtime data flow; build and packaging details live in CMake.
+
+### 🔄 Runtime Ownership and Frame Scheduling
+
+Each process owns one `BongoCatApp` and one main-thread event and render loop.
+Platform listeners stop at the input boundary:
 
 ```text
-SDL events and native hooks
+Platform listeners
+(keyboard / pointer)
             |
             v
-     input state (C11 atomics) ---> main-thread application
-                                             |
-                              model parameters and UI state
-                                             |
-                              Cubism update -> OpenGL draw
+  C11 input state
+  (atomic edge queue + coalesced pointer position)
+            |
+            v
+  main-thread application <----- SDL3 events
+            |
+            v
+  model parameters, overlay, and UI state
+            |
+            v
+  model update -> OpenGL composition -> platform presentation
 ```
 
-The platform hooks do not touch a model. They publish timestamped events to a
-bounded queue; pointer coordinates are coalesced separately so mouse movement
-does not consume the queue needed for key and button transitions. The main loop
-drains the queue, applies releases and parameters, updates the model, and swaps
-the SDL OpenGL window.
+The Windows Raw Input receiver, macOS Quartz event tap, and Linux XInput2 listener
+run outside the main loop. They publish timestamped key and mouse-button edges
+to the bounded atomic queue and coalesce pointer motion separately, so frequent
+motion cannot displace ordered key and button edges. Native SDL wake events
+notify the main thread. Windows registers a message-only receiver for background
+keyboard and mouse input with `RIDEV_INPUTSINK | RIDEV_DEVNOTIFY`, preserving legacy
+window messages. Device motion drives the model when another application hides
+or locks the cursor; SDL supplies the desktop cursor position. The receiver
+tracks held inputs per device and clears them on device removal or desktop
+switches. It does not install input hooks, use DirectInput, or send input to games.
+SDL3 window, preferences, and gamepad events
+are handled on the main thread, where gamepad events are normalized before they
+reach model parameters or shortcuts. No platform listener calls Live2D,
+overlay, or UI code directly.
 
-Frames are submitted when something changed. An idle Cubism model is allowed to
-accumulate a short time slice before it updates, which keeps an idle transparent
-window quiet without making motions depend on a fixed frame rate.
+`bongo_cat_app_run` handles update-shutdown and secondary-process arguments,
+enforces single-instance ownership for the primary process, allocates the
+application state, runs initialization, enters `bongo_cat_app_loop`, and then
+flushes state and destroys resources in a defined order. Initialization loads
+configuration and storage paths, locates assets, creates the SDL/OpenGL pet
+window, initializes the platform backend, creates the Live2D, overlay, and
+audio services, scans the built-in/installed/nearby model sources, and loads a
+usable model. `BongoCatApp` owns settings, session state, model and behavior
+catalogs, platform handles, and runtime service handles.
 
-The C runtime calls a small interface in `src/live2d`. The Cubism implementation
-is C++17 because that is the SDK's API; the rest of the application remains C11.
-This keeps SDK types out of the public headers and makes the diagnostic backend
-possible.
+Installed model packages use Mver as the canonical format. The import workflow
+resolves a selected file or directory, discovers and validates candidates,
+fingerprints package identity, converts Tauri sources to Mver, applies image
+patches, and commits the normalized package under `models_root`. It then
+generates the runtime adapter and refreshes the catalogs. Nearby sources are
+discovered without installing their source tree; their adapters and inspection
+results are cached outside `models_root` under `cache_root`.
 
-## Source Tree
+Each main-loop iteration waits for SDL/native wakeups or the earliest pending
+frame, UI, animation, or pointer-hit deadline (with a maximum wait of 250 ms).
+It dispatches queued SDL events, drains the atomic input queue and release
+recovery, updates window and model-refresh state, and applies input-derived
+parameters. With Cubism enabled, the model deadline follows
+`settings.model.max_fps` (60 FPS by default); diagnostic builds use a 100 ms
+fallback interval. The elapsed model time is capped at 250 ms and split into up
+to eight substeps, targeting no more than 1/30 s per substep.
 
-```text
-include/bongo_cat/       public C interfaces and data structures
-src/core/             config, paths, input state, catalogs, hashes
-src/runtime/          application lifecycle, model import, and UI flow
-src/render/           OpenGL helpers and overlays
-src/live2d/           Cubism bridge and diagnostic backend
-src/platform/         Win32, Cocoa, X11, input, and tray adapters
-src/ui/               Nuklear backend, preferences, themes, localization
-resources/assets/     bundled models, textures, locales, and tray assets
-tests/                native tests and fixtures
-cmake/                dependency, optimization, audit, and source-policy modules
-docs/                 audit evidence and parity notes
+The normal pet path renders only when the window is visible, not minimized, and
+marked dirty. A frame clears the background, draws the model, and composites
+pointer, key, and effect overlays before calling the platform presenter.
+Preview operations can request immediate renders, while capture renders may
+skip presentation. macOS and Linux swap the SDL OpenGL window directly.
+Windows swaps directly when layered presentation is inactive and otherwise
+reads back the frame for `UpdateLayeredWindow`. The preferences UI owns a
+separate SDL/OpenGL window and is rendered and presented independently from
+the pet window.
+
+The C runtime calls the ABI declared in `include/bongo_cat/model.h`. The Live2D
+bridge and Cubism implementation live in `src/live2d` and use C++17 only when
+the Cubism SDK is enabled; the rest of the native runtime uses C11. Cubism
+types remain behind opaque C handles, while `src/live2d/live2d_stub.c` provides
+the diagnostic backend when the SDK is unavailable.
+
+
+```mermaid
+flowchart TB
+  Input(["Keyboard / mouse / gamepad"])
+  BuiltIn(["Built-in model assets"])
+  Sources(["External model sources<br/>Mver, Tauri, .model3.json, image patches"])
+  Desktop(["Pet window and preferences window"])
+
+  subgraph Runtime["BongoCat native runtime"]
+    direction TB
+    Entry["src/main.c<br/>bongo_cat_app_run"]
+    Startup["Startup and initialization<br/>configuration, storage, window, platform"]
+    Loop["SDL3 main loop<br/>wait, dispatch, update, render"]
+    Shutdown["Shutdown<br/>flush state, stop services, release resources"]
+    InputQueue[("Atomic input state<br/>edge queue and coalesced pointer position")]
+    InputDispatch["Input dispatch<br/>shortcuts, pointer mapping, model parameters"]
+    State[("BongoCatApp state<br/>settings, session, catalogs, runtime handles")]
+    Import["Model discovery and import<br/>validate, normalize to Mver, install/cache"]
+    Catalog[("Model and behavior catalogs")]
+    Live2D["Live2D C ABI<br/>Cubism SDK or diagnostic stub"]
+    Overlay["Overlay and audio"]
+    Preferences["Preferences and desktop shell<br/>Nuklear UI, tray, window actions"]
+    Compose["OpenGL frame composition"]
+    Present["Platform presentation"]
+
+    Entry --> Startup --> Loop
+    Loop --> Shutdown
+    Loop --> InputDispatch --> State
+    Loop <--> State
+    State --> Live2D
+    State --> Overlay
+    State <--> Preferences
+    Loop --> Preferences
+    Catalog --> State
+    State --> Compose
+    Live2D --> Compose
+    Overlay --> Compose
+    Compose --> Present
+    Loop --> Compose
+  end
+
+  subgraph Platform["Platform backends"]
+    direction LR
+    Global["Global keyboard / pointer capture<br/>Windows, macOS, Linux"]
+    SDL["SDL3 events<br/>window and gamepad events"]
+  end
+
+  Input --> Global --> InputQueue --> InputDispatch
+  Input --> SDL --> Loop
+  BuiltIn --> Catalog
+  Sources --> Import --> Catalog
+  Present --> Desktop
+  Preferences --> Desktop
 ```
 
-## Dependencies
+## ❓ FAQ
 
-The build uses SDL3 for the window and event loop, desktop OpenGL for drawing,
-yyjson for JSON, stb for image loading, miniaudio for motion audio, and
-Nuklear for the preferences UI. With `BONGO_CAT_FETCH_DEPS=ON` (the default), CMake
-fetches pinned revisions of those open-source dependencies and verifies their
-SHA-256 values. Set it to `OFF` to use installed packages and headers instead.
+### 🔒 Does BongoCat record my keyboard or mouse input?
 
-The Live2D Cubism SDK is a separate download. Put Cubism SDK for Native 5 r.5
-at `vendor/CubismSdkForNative` after accepting Live2D's license. The expected
-tree contains `Core`, `Framework`, and the SDK's OpenGL sample dependencies.
-On Windows, run the SDK helper once:
+No. BongoCat processes keyboard and mouse input locally to drive animations
+and shortcuts. It does not record or upload your keystrokes, mouse actions, or
+other interaction data. Configuration is stored locally as well, and the app
+contains no ads, analytics tools, or user-tracking code. When an update check
+is performed, it only requests public release metadata; it does not send input,
+configuration, or usage data.
 
-```powershell
-cd vendor\CubismSdkForNative\Samples\OpenGL\thirdParty\scripts
-.\setup_glew_glfw.bat
+### Linux Wayland Input
+
+X11 uses XInput2 by default. Experimental evdev input for Wayland is off by
+default. After reviewing [the input permission risks](SECURITY.md#linux-input),
+it can be explicitly selected for one launch:
+
+```sh
+BONGOCAT_ENABLE_EVDEV=1 ./build/BongoCat
 ```
 
-The SDK is ignored by Git and is never fetched by this project.
+This does not grant device permissions. Do not run the app as root or add
+your account to the `input` group to make it work. Raw input can include
+password keystrokes and is not paused on screen lock or session switching.
+Close the app to stop monitoring; hiding it does not stop input. Launch
+without the variable to return to the default backend. Evdev mouse following
+uses unaccelerated device motion; Wayland placement, click-through, and
+always-on-top support still depend on the compositor.
 
-## Building
+### 🖼️ Why OpenGL instead of Vulkan?
 
-### Windows with Cubism
+We chose OpenGL not because Vulkan is bad, but because BongoCat does not need
+that level of complexity. The app mainly renders one Live2D model, a few UI
+layers, and a transparent desktop window. OpenGL already handles that
+comfortably, and it works naturally with SDL3 and Cubism's OpenGL renderer.
+Moving to Vulkan would mean maintaining much more rendering and synchronization
+code across three desktop platforms, without a noticeable improvement for
+users. For BongoCat's current workload, OpenGL keeps the renderer smaller,
+easier to debug, and easier to maintain while still delivering the performance
+we need.
 
-Use Visual Studio 2022 or the matching Build Tools (v143, Windows 10/11 SDK):
 
-```bat
-build.bat Release
-```
 
-The repository build script displays a live `#F77DAA` progress bar, keeps
-configuration and build logs under `build-cubism/`, and uses two parallel jobs
-by default. Set `BONGOCAT_BUILD_JOBS` to change the job count or set
-`BONGOCAT_CLEAN_BUILD=1` to request a clean build. The Cubism SDK is used
-automatically when it is present; set `BONGOCAT_REQUIRE_CUBISM=1` to fail
-instead of using the diagnostic backend when it is missing. The equivalent
-manual commands are:
+## Project Status
+![Alt](https://repobeats.axiom.co/api/embed/74334755a589dea40c5d31f8d2bcdc6c2bd39d87.svg "Repobeats analytics image")
 
-```powershell
-cmake -S . -B build-cubism -G "Visual Studio 17 2022" -A x64 `
-  -DBONGO_CAT_REQUIRE_CUBISM=ON `
-  -DBONGO_CAT_WARNINGS_AS_ERRORS=ON
-cmake --build build-cubism --config Release --parallel 2
-ctest --test-dir build-cubism -C Release --output-on-failure
-```
+## Sponsors
 
-The executable is `build-cubism/Release/BongoCat.exe`.
+<div align="center">
+  <table align="center">
+    <tr>
+      <td style="vertical-align: middle; padding-right: 10px;">
+        <img alt="SignPath" src="https://signpath.org/assets/favicon-50x50.png" />
+      </td>
+      <td style="vertical-align: middle;">
+        Free code signing on Windows provided by
+        <a href="https://signpath.io">SignPath.io</a>, certificate by
+        <a href="https://signpath.org/">SignPath Foundation</a>
+      </td>
+    </tr>
+  </table>
+</div>
 
-Build the versioned release archive and SHA-256 file with:
 
-```powershell
-cmake --build build-cubism --config Release --target package
-```
 
-Release archives use the conventional product-version-platform-architecture
-format, for example `BongoCat-0.1.0-windows-x64.zip`. The executable inside
-keeps the stable `BongoCat.exe` name so upgrades do not break shortcuts.
+## 🙏 Special Thanks
+> [!TIP]
+> Every step BongoCat takes is powered by the spirit of open source. We sincerely thank all our community contributors for their selfless contributions It is your support that makes desktop companionship more free and genuine.❤️‍🔥
 
-### Diagnostic or Unix build
 
-```powershell
-cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-ctest --test-dir build --output-on-failure
-```
+<a href="https://bongocat.pet">
+    <img src="https://bongocat.pet/co" />
+</a>
 
-The native Linux branch requires the usual OpenGL and X11/XInput2/Xfixes
-development packages. macOS uses its Cocoa and ApplicationServices frameworks.
 
-To use system dependencies rather than CMake's pinned downloads:
+[linux.do](https://linux.do/t/topic/2845597)
+---
 
-```powershell
-cmake -S . -B build -G Ninja -DBONGO_CAT_FETCH_DEPS=OFF
-```
+<div align="center">
 
-When fetching is disabled, CMake needs SDL3-static and yyjson package
-configurations plus `stb_image.h`, `stb_image_write.h`, `miniaudio.h`, and
-`nuklear.h`. Their include roots can be set with
-`BONGO_CAT_STB_INCLUDE_DIR`, `BONGO_CAT_MINIAUDIO_INCLUDE_DIR`, and
-`BONGO_CAT_NUKLEAR_INCLUDE_DIR`.
+Copyright © 2026 - **BongoCat**\
+By vladelaina\
+Made with ❤️ & ⌨️
 
-### Install tree
-
-```powershell
-cmake --install build --config Release --component Runtime --prefix out
-```
-
-The install tree is portable. Windows embeds the resource archive; Unix builds
-place `assets/` beside the executable or application bundle. Settings and
-imported models are kept in the per-user data directory.
-Native preferences and session files use schema version 2. Version 1 and any
-other unsupported schema are rejected and rebuilt from current defaults; no
-configuration migration path is retained.
-
-## Runtime Data and Test Switches
-
-The default data directory comes from SDL's preference path and contains
-`preferences.json`, `session.json`, `custom-models/`, and the generated `portable-mver/` adapter
-cache. A Bongo-Cat-Mver package can be used without importing by placing its
-`config.json` and `img/` beside `BongoCat`, by placing the intact package
-directory there, or by keeping both under the same immediate parent directory.
-A collection such as `露西亚-誓焰版` may be selected as one folder; its full
-package and nested image patches are discovered together.
-Tests and portable launches may override both paths:
-
-```text
-BongoCat --data-root=C:\path\to\data --preferences=C:\path\to\preferences.json --session=C:\path\to\session.json
-```
-
-Arguments beginning with `--ci-` are test instrumentation. They select a model,
-preference page, language, theme, frame audit, or input audit; they are not a
-stable end-user command-line interface.
-
-## Tests
-
-The CTest suite covers strict configuration-format validation, model discovery,
-input ordering and recovery, shortcuts, localization, UI helpers, application
-state, and SHA-256 resource validation. Only the current configuration format
-is accepted; older schemas are rejected without migration.
-
-```powershell
-ctest --test-dir build --output-on-failure
-cmake --build build --target check-lines
-```
-
-`check-lines` enforces a default maximum of 300 physical lines for native C,
-C++, Objective-C, header, CMake module, and native test files. A small set of
-mechanically dense files has reviewed, explicit limits in the policy. The rule
-is a review aid, not a claim that shorter files are automatically better.
-
-## Continuous Integration
-
-GitHub Actions runs Cppcheck, the source-size check, a warning-clean Linux build,
-CTest, and a Windows/Linux/macOS build matrix on pushes, pull requests, tags,
-and manual runs. CI artifacts use the diagnostic backend; a licensed Cubism SDK
-is not provisioned on the runners.
-
-## Third-Party and Distribution Notes
-
-Third-party components retain their upstream licenses. Cubism SDK files must be
-obtained from Live2D and are not redistributed here. Before distributing a
-binary, review the licenses for SDL3, yyjson, stb, miniaudio, Nuklear, OpenGL,
-and the selected platform SDK together with the project's own distribution
-terms.
+</div>
