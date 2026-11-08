@@ -1,0 +1,287 @@
+name: 同步 Releases
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * *'
+
+jobs:
+  sync-releases:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 获取源仓库所有 Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TARGET_REPO="${{ github.repository }}"
+
+          REPO_INFO=$(curl -sS -4 --retry 3 \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/$TARGET_REPO")
+
+          if ! echo "$REPO_INFO" | jq -e '.full_name' > /dev/null 2>&1; then
+            echo "错误：获取当前仓库信息失败。" >&2
+            echo "$REPO_INFO" >&2
+            exit 1
+          fi
+
+          SOURCE_REPO=$(echo "$REPO_INFO" | jq -r '.source.full_name // empty')
+          if [ -z "$SOURCE_REPO" ]; then
+            echo "错误：当前仓库不是 fork，无法获取根仓库。" >&2
+            exit 1
+          fi
+          echo "自动识别源仓库（source）: $SOURCE_REPO"
+
+          PAGE=1
+          PER_PAGE=100
+          ALL_JSON="[]"
+
+          while true; do
+            API_URL="https://api.github.com/repos/${SOURCE_REPO}/releases?per_page=${PER_PAGE}&page=${PAGE}"
+            RESPONSE=$(curl -sS -4 --retry 3 --retry-delay 3 \
+              -H "Accept: application/vnd.github.v3+json" \
+              -H "Authorization: token $GH_TOKEN" \
+              "$API_URL")
+
+            if ! echo "$RESPONSE" | jq -e 'type == "array"' > /dev/null 2>&1; then
+              echo "错误：API 响应不是数组，退出。" >&2
+              echo "响应内容：$RESPONSE" >&2
+              exit 1
+            fi
+
+            COUNT=$(echo "$RESPONSE" | jq 'length')
+            if [ "$COUNT" -eq 0 ]; then
+              break
+            fi
+
+            ALL_JSON=$(echo "$ALL_JSON" "$RESPONSE" | jq -s 'add')
+            PAGE=$((PAGE + 1))
+            sleep 0.5
+          done
+
+          echo "$ALL_JSON" | jq 'sort_by(.created_at // "", .tag_name)' > releases.json
+          echo "共获取 $(jq length releases.json) 个 Release。"
+
+      - name: 按顺序处理每个 Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TARGET_REPO="${{ github.repository }}"
+          UA="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
+          WORK_DIR=$(mktemp -d)
+          trap 'rm -rf "$WORK_DIR"' EXIT
+
+          safe_asset_name() {
+            local n="$1"
+            [ -z "$n" ] && return 1
+            case "$n" in
+              */*|*\\*|*$'\n'*|*$'\r'*|*$'\t'*|.|..) return 1 ;;
+            esac
+            return 0
+          }
+
+          download_asset() {
+            local url="$1" name="$2" outdir="$3"
+            if ! safe_asset_name "$name"; then
+              echo "    ⚠️ 跳过非法资产名: $(printf '%q' "$name")"
+              return 1
+            fi
+            echo "    ⬇️ 下载: $name"
+            if curl -fL -sS -4 \
+                 -A "$UA" \
+                 --retry 5 --retry-all-errors --retry-delay 5 \
+                 --connect-timeout 30 \
+                 -w "      HTTP %{http_code}, 大小 %{size_download} 字节\n" \
+                 -o "$outdir/$name" \
+                 "$url"; then
+              echo "      ✅ 下载成功"
+              return 0
+            else
+              echo "      ❌ 下载失败"
+              rm -f "$outdir/$name"
+              return 1
+            fi
+          }
+
+          if [ "$(jq length releases.json)" -eq 0 ]; then
+            echo "源仓库无 Release，结束。"
+            exit 0
+          fi
+
+          jq -c '.[]' releases.json > "$WORK_DIR/list.jsonl"
+
+          while IFS= read -r release; do
+            TAG_NAME=$(echo "$release" | jq -r '.tag_name // empty')
+            if [ -z "$TAG_NAME" ]; then
+              echo "跳过：tag_name 为空"
+              continue
+            fi
+            TITLE=$(echo "$release" | jq -r '.name // .tag_name')
+            if [ -z "$TITLE" ]; then
+              TITLE="$TAG_NAME"
+            fi
+            BODY=$(echo "$release" | jq -r '.body // ""')
+            IS_PRERELEASE=$(echo "$release" | jq -r '.prerelease')
+            IS_DRAFT=$(echo "$release" | jq -r '.draft')
+            TAG_ENC=$(jq -rn --arg v "$TAG_NAME" '$v|@uri')
+
+            echo "=============================="
+            echo "处理 Release: $TAG_NAME"
+
+            HTTP_STATUS=$(curl -sS -4 -o /dev/null -w "%{http_code}" \
+              -H "Authorization: token $GH_TOKEN" \
+              "https://api.github.com/repos/$TARGET_REPO/releases/tags/$TAG_ENC") || {
+              echo "  查询目标 Release 失败（curl 错误），跳过本次。"
+              continue
+            }
+
+            if [ "$HTTP_STATUS" = "200" ]; then
+              echo "目标仓库已存在，对比标题、内容、预发行、draft 状态与资产。"
+              TARGET_RELEASE=$(curl -sS -4 --retry 3 --retry-delay 3 \
+                -H "Authorization: token $GH_TOKEN" \
+                "https://api.github.com/repos/$TARGET_REPO/releases/tags/$TAG_ENC") || {
+                echo "  获取目标 Release 详情失败，跳过本次。"
+                continue
+              }
+
+              if ! echo "$TARGET_RELEASE" | jq -e '.tag_name' > /dev/null 2>&1; then
+                echo "  目标 Release 响应无效，跳过本次。"
+                continue
+              fi
+
+              TARGET_TITLE=$(echo "$TARGET_RELEASE" | jq -r '.name // ""')
+              TARGET_BODY=$(echo "$TARGET_RELEASE" | jq -r '.body // ""')
+              TARGET_PRERELEASE=$(echo "$TARGET_RELEASE" | jq -r '.prerelease')
+              TARGET_DRAFT=$(echo "$TARGET_RELEASE" | jq -r '.draft')
+
+              NEED_UPDATE=0
+              if [ "$TITLE" != "$TARGET_TITLE" ]; then
+                echo "  标题有差异。"
+                NEED_UPDATE=1
+              fi
+              if [ "$BODY" != "$TARGET_BODY" ]; then
+                echo "  内容有差异。"
+                NEED_UPDATE=1
+              fi
+              if [ "$IS_PRERELEASE" != "$TARGET_PRERELEASE" ]; then
+                echo "  预发行状态有差异：源=$IS_PRERELEASE 目标=$TARGET_PRERELEASE"
+                NEED_UPDATE=1
+              fi
+              if [ "$IS_DRAFT" != "$TARGET_DRAFT" ]; then
+                echo "  draft 状态有差异：源=$IS_DRAFT 目标=$TARGET_DRAFT"
+                NEED_UPDATE=1
+              fi
+
+              if [ "$NEED_UPDATE" -eq 1 ]; then
+                printf '%s' "$BODY" > "$WORK_DIR/body.txt"
+                EDIT_ARGS=(release edit --repo "$TARGET_REPO" --title "$TITLE" --notes-file "$WORK_DIR/body.txt")
+                if [ "$IS_PRERELEASE" = "true" ]; then
+                  EDIT_ARGS+=(--prerelease)
+                else
+                  EDIT_ARGS+=(--prerelease=false)
+                fi
+                if [ "$IS_DRAFT" = "true" ]; then
+                  EDIT_ARGS+=(--draft)
+                else
+                  EDIT_ARGS+=(--draft=false)
+                fi
+                if gh "${EDIT_ARGS[@]}" -- "$TAG_NAME"; then
+                  echo "  ✅ Release 元数据更新成功。"
+                else
+                  echo "  ❌ Release 元数据更新失败。"
+                fi
+                rm -f "$WORK_DIR/body.txt"
+              fi
+
+              echo "$release" | jq -S -c '.assets[]? | select(.state=="uploaded") | {name,size}' | LC_ALL=C sort > "$WORK_DIR/src_assets"
+              echo "$TARGET_RELEASE" | jq -S -c '.assets[]? | select(.state=="uploaded") | {name,size}' | LC_ALL=C sort > "$WORK_DIR/tgt_assets"
+              LC_ALL=C comm -23 "$WORK_DIR/src_assets" "$WORK_DIR/tgt_assets" > "$WORK_DIR/changed_assets" || true
+
+              if [ -s "$WORK_DIR/changed_assets" ]; then
+                echo "  待补传/更新的资产："
+                jq -r '.name' "$WORK_DIR/changed_assets" | sed 's/^/    - /'
+                DL_DIR=$(mktemp -d -p "$WORK_DIR")
+                UPLOAD_FILES=()
+                while IFS= read -r asset_json; do
+                  [ -z "$asset_json" ] && continue
+                  asset_name=$(echo "$asset_json" | jq -r '.name')
+                  ASSET_URL=$(echo "$release" | jq -r --arg n "$asset_name" '[.assets[] | select(.name==$n) | .browser_download_url][0] // empty')
+                  if [ -z "$ASSET_URL" ]; then
+                    echo "    ⚠️ 找不到资产 URL: $asset_name"
+                    continue
+                  fi
+                  if download_asset "$ASSET_URL" "$asset_name" "$DL_DIR"; then
+                    UPLOAD_FILES+=("$DL_DIR/$asset_name")
+                  fi
+                  sleep 1
+                done < "$WORK_DIR/changed_assets"
+
+                if [ ${#UPLOAD_FILES[@]} -gt 0 ]; then
+                  for f in "${UPLOAD_FILES[@]}"; do
+                    echo "  ⬆️ 上传: $(basename "$f")"
+                    if gh release upload --repo "$TARGET_REPO" --clobber -- "$TAG_NAME" "$f"; then
+                      echo "    ✅ 上传成功"
+                    else
+                      echo "    ❌ 上传失败（保留现有资产，后续可重跑补传）"
+                    fi
+                  done
+                fi
+                rm -rf "$DL_DIR"
+              else
+                echo "  资产完整且一致，无需补传。"
+              fi
+
+              continue
+            fi
+
+            if [ "$HTTP_STATUS" != "404" ]; then
+              echo "  查询目标 Release 返回 $HTTP_STATUS，跳过（不自动创建）。"
+              continue
+            fi
+
+            echo "目标不存在，创建 Release。"
+            printf '%s' "$BODY" > "$WORK_DIR/body.txt"
+            CREATE_ARGS=(release create --repo "$TARGET_REPO" --title "$TITLE" --notes-file "$WORK_DIR/body.txt")
+            if [ "$IS_PRERELEASE" = "true" ]; then
+              CREATE_ARGS+=(--prerelease)
+            fi
+            if [ "$IS_DRAFT" = "true" ]; then
+              CREATE_ARGS+=(--draft)
+            fi
+
+            if ! gh "${CREATE_ARGS[@]}" -- "$TAG_NAME"; then
+              echo "❌ 创建 Release $TAG_NAME 失败，退出。"
+              exit 1
+            fi
+            rm -f "$WORK_DIR/body.txt"
+
+            DL_DIR=$(mktemp -d -p "$WORK_DIR")
+            UPLOAD_FILES=()
+            echo "$release" | jq -c '.assets[]? | select(.state=="uploaded")' > "$WORK_DIR/assets.jsonl"
+            while IFS= read -r asset_json; do
+              [ -z "$asset_json" ] && continue
+              asset_name=$(echo "$asset_json" | jq -r '.name')
+              asset_url=$(echo "$asset_json" | jq -r '.browser_download_url')
+              if download_asset "$asset_url" "$asset_name" "$DL_DIR"; then
+                UPLOAD_FILES+=("$DL_DIR/$asset_name")
+              fi
+              sleep 1
+            done < "$WORK_DIR/assets.jsonl"
+
+            if [ ${#UPLOAD_FILES[@]} -gt 0 ]; then
+              for f in "${UPLOAD_FILES[@]}"; do
+                echo "  ⬆️ 上传: $(basename "$f")"
+                if gh release upload --repo "$TARGET_REPO" --clobber -- "$TAG_NAME" "$f"; then
+                  echo "    ✅ 上传成功"
+                else
+                  echo "    ❌ 上传失败（保留现有资产，后续可重跑补传）"
+                fi
+              done
+            fi
+            rm -rf "$DL_DIR"
+          done < "$WORK_DIR/list.jsonl"
