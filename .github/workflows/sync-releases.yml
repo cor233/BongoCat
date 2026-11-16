@@ -1,4 +1,4 @@
-name: 同步 Releases
+name: Sync Releases
 
 on:
   workflow_dispatch:
@@ -38,7 +38,9 @@ jobs:
 
           PAGE=1
           PER_PAGE=100
-          ALL_JSON="[]"
+          PAGES_FILE=$(mktemp)
+          trap 'rm -f "$PAGES_FILE"' EXIT
+          : > "$PAGES_FILE"
 
           while true; do
             API_URL="https://api.github.com/repos/${SOURCE_REPO}/releases?per_page=${PER_PAGE}&page=${PAGE}"
@@ -58,12 +60,12 @@ jobs:
               break
             fi
 
-            ALL_JSON=$(echo "$ALL_JSON" "$RESPONSE" | jq -s 'add')
+            echo "$RESPONSE" | jq -c '.[]' >> "$PAGES_FILE"
             PAGE=$((PAGE + 1))
             sleep 0.5
           done
 
-          echo "$ALL_JSON" | jq 'sort_by(.created_at // "", .tag_name)' > releases.json
+          jq -s 'sort_by(.created_at // "", .tag_name)' "$PAGES_FILE" > releases.json
           echo "共获取 $(jq length releases.json) 个 Release。"
 
       - name: 按顺序处理每个 Release
@@ -94,6 +96,7 @@ jobs:
             echo "    ⬇️ 下载: $name"
             if curl -fL -sS -4 \
                  -A "$UA" \
+                 -H "Authorization: token ${GH_TOKEN:-}" \
                  --retry 5 --retry-all-errors --retry-delay 5 \
                  --connect-timeout 30 \
                  -w "      HTTP %{http_code}, 大小 %{size_download} 字节\n" \
@@ -106,6 +109,60 @@ jobs:
               rm -f "$outdir/$name"
               return 1
             fi
+          }
+
+          sync_source_archives() {
+            local release="$1" target_repo="$2" tag="$3" work_dir="$4" target_release="$5"
+            local zip_name="${tag}.zip"
+            local tar_name="${tag}.tar.gz"
+            local zip_url tar_url
+
+            zip_url=$(echo "$release" | jq -r '.zipball_url // empty')
+            tar_url=$(echo "$release" | jq -r '.tarball_url // empty')
+
+            local missing_urls=()
+            local missing_names=()
+
+            if [ -n "$zip_url" ]; then
+              if [ -z "$target_release" ]; then
+                missing_urls+=("$zip_url")
+                missing_names+=("$zip_name")
+              elif ! echo "$target_release" | jq -e --arg n "$zip_name" '.assets[]? | select(.name==$n and .state=="uploaded")' > /dev/null 2>&1; then
+                missing_urls+=("$zip_url")
+                missing_names+=("$zip_name")
+              fi
+            fi
+
+            if [ -n "$tar_url" ]; then
+              if [ -z "$target_release" ]; then
+                missing_urls+=("$tar_url")
+                missing_names+=("$tar_name")
+              elif ! echo "$target_release" | jq -e --arg n "$tar_name" '.assets[]? | select(.name==$n and .state=="uploaded")' > /dev/null 2>&1; then
+                missing_urls+=("$tar_url")
+                missing_names+=("$tar_name")
+              fi
+            fi
+
+            if [ ${#missing_urls[@]} -eq 0 ]; then
+              return 0
+            fi
+
+            echo "  同步源码包："
+            local arch_dir i url name
+            arch_dir=$(mktemp -d -p "$work_dir")
+            for i in "${!missing_urls[@]}"; do
+              url="${missing_urls[$i]}"
+              name="${missing_names[$i]}"
+              if download_asset "$url" "$name" "$arch_dir"; then
+                if gh release upload --repo "$target_repo" --clobber -- "$tag" "$arch_dir/$name"; then
+                  echo "    ✅ 源码包上传成功: $name"
+                else
+                  echo "    ❌ 源码包上传失败: $name"
+                fi
+              fi
+              sleep 1
+            done
+            rm -rf "$arch_dir"
           }
 
           if [ "$(jq length releases.json)" -eq 0 ]; then
@@ -236,6 +293,8 @@ jobs:
                 echo "  资产完整且一致，无需补传。"
               fi
 
+              sync_source_archives "$release" "$TARGET_REPO" "$TAG_NAME" "$WORK_DIR" "$TARGET_RELEASE"
+
               continue
             fi
 
@@ -284,4 +343,7 @@ jobs:
               done
             fi
             rm -rf "$DL_DIR"
+
+            sync_source_archives "$release" "$TARGET_REPO" "$TAG_NAME" "$WORK_DIR" ""
+
           done < "$WORK_DIR/list.jsonl"
